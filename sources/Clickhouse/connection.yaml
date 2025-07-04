@@ -1,0 +1,6 @@
+# This file was automatically generated
+name: Clickhouse
+type: clickhouse
+options:
+  url: https://coyfxfsutt.ap-south-1.aws.clickhouse.cloud:8443
+  username: default
