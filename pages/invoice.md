@@ -197,7 +197,7 @@ ORDER BY revenue_ytd DESC;
 <DataTable 
     data={customer_level}
     subtitle="Only customers invoiced in the last 3 months are included"
-    rows=20
+    rows=15
     link=detail_link
     wrapTitles=true
 >
