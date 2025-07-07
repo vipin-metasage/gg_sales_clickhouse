@@ -10,18 +10,18 @@ SELECT
     ' '
 ) AS customer_name
 ,
-    destination_country,
     country_name,
     document_currency,
     freight_charges,
     invoice_type,
-    sales_quantity,
+    invoice_quantity AS sales_quantity,
     sales_unit,
     unit,
     units_per_sales_unit,
     invoice_quantity,
     requested_quantity,
     net_value,
+    unit_price,
     tax_amount,
     total_amount,
     shipping_term,
@@ -33,14 +33,14 @@ SELECT
     gross_weight,
     weight_unit,
     payment_term_description,
-    payment_due_date,
+    baseline_date,
     payment_date,
     payment_days,
     amount_paid,
     outstanding_amount,
     payment_status,
     material_group,
-    dateDiff('day', payment_due_date, payment_date) AS delay_days
+    dateDiff('day', baseline_date, payment_date) AS delay_days
 FROM manufacturing.analytics
 where invoice_date >= '2015-01-01'
   AND shipping_term NOT IN ('EXW');

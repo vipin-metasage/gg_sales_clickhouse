@@ -1,5 +1,5 @@
 ---
-title: Invoice
+title: Invoice Insights Dashboard
 ---
 
 
@@ -114,7 +114,7 @@ ORDER BY customer_name;
 WITH base AS (
     SELECT
         customer_name AS customer,
-        destination_country AS country,
+        country_name AS country,
         material_number AS sku_id,
         invoice_date AS billing_date,
         invoice_number AS billing_document,
@@ -122,7 +122,7 @@ WITH base AS (
         sales_quantity AS billing_qty,
         document_currency AS currency,
         CAST(EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP)) AS VARCHAR) AS billing_year,
-        (total_amount / NULLIF(sales_quantity, 0)) AS unit_price,
+        unit_price,
         shipping_term AS incoterms_part1,
         material_group AS material_group_desc
     FROM manu
