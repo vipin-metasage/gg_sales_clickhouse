@@ -116,71 +116,55 @@ WITH base AS (
         customer_name AS customer,
         country_name AS country,
         material_number AS sku_id,
-        invoice_date AS billing_date,
+        CAST(invoice_date AS TIMESTAMP) AS billing_date,
         invoice_number AS billing_document,
         total_amount,
         sales_quantity AS billing_qty,
         document_currency AS currency,
-        CAST(EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP)) AS VARCHAR) AS billing_year,
+        EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP))::VARCHAR AS billing_year,
         unit_price,
         shipping_term AS incoterms_part1,
         material_group AS material_group_desc
     FROM manu
-    WHERE sales_quantity > 0
-    AND material_group LIKE '${inputs.material_group.value}'
-    AND payment_term_description LIKE '${inputs.payment_term_description.value}'
-    AND material_description LIKE '${inputs.sku.value}'
-    AND customer_name LIKE '${inputs.customer.value}'
-    AND CAST(EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP)) AS VARCHAR) LIKE '${inputs.year.value}'
+    WHERE 
+        sales_quantity > 0
+        AND material_group LIKE '${inputs.material_group.value}'
+        AND payment_term_description LIKE '${inputs.payment_term_description.value}'
+        AND material_description LIKE '${inputs.sku.value}'
+        AND customer_name LIKE '${inputs.customer.value}'
+        AND EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP))::VARCHAR LIKE '${inputs.year.value}'
 ),
-year_ref AS (
-    SELECT MAX(CAST(EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP)) AS VARCHAR)) AS latest_year
-    FROM manu
-),
-max_date AS (
-    SELECT MAX(CAST(invoice_date AS TIMESTAMP)) AS max_billing_date
-    FROM manu
-),
-active_customers AS (
-    SELECT DISTINCT customer
+metadata AS (
+    SELECT 
+        MAX(EXTRACT(YEAR FROM billing_date)::VARCHAR) AS latest_year,
+        MAX(billing_date) AS max_billing_date
     FROM base
-    WHERE billing_date >= (
-        SELECT max_billing_date - INTERVAL '3 months'
-        FROM max_date
-    )
-),
-latest_invoice_dates AS (
-    SELECT customer, MAX(billing_date) AS latest_invoice_date
-    FROM base
-    GROUP BY customer
-),
-first_invoice_dates AS (
-    SELECT customer, MIN(billing_date) AS first_invoice_date
-    FROM base
-    GROUP BY customer
 ),
 aggregated AS (
     SELECT
-        ac.customer,
-        lid.latest_invoice_date,
-        fid.first_invoice_date,
-        ANY_VALUE(b.currency) AS currency,
-        COUNT(DISTINCT CASE WHEN b.billing_year = (SELECT latest_year FROM year_ref) THEN b.billing_document END) AS invoice_ytd,
-        SUM(CASE WHEN b.billing_year = (SELECT latest_year FROM year_ref) THEN b.billing_qty ELSE 0 END) AS sku_quantity_ytd,
-        SUM(CASE WHEN b.billing_year = (SELECT latest_year FROM year_ref) THEN b.total_amount ELSE 0 END) AS revenue_ytd,
+        b.customer,
+        MIN(b.billing_date) AS first_invoice_date,
+        MAX(b.billing_date) AS latest_invoice_date,
+        b.currency,
+        COUNT(DISTINCT CASE WHEN b.billing_year = m.latest_year THEN b.billing_document END) AS invoice_ytd,
+        SUM(CASE WHEN b.billing_year = m.latest_year THEN b.billing_qty ELSE 0 END) AS sku_quantity_ytd,
+        SUM(CASE WHEN b.billing_year = m.latest_year THEN b.total_amount ELSE 0 END) AS revenue_ytd,
         COUNT(DISTINCT b.billing_document) AS total_invoices,
         SUM(b.billing_qty) AS sku_quantity,
         SUM(b.total_amount) AS total_revenue
-    FROM active_customers ac
-    JOIN base b ON b.customer = ac.customer
-    JOIN latest_invoice_dates lid ON lid.customer = ac.customer
-    JOIN first_invoice_dates fid ON fid.customer = ac.customer
-    GROUP BY ac.customer, lid.latest_invoice_date, fid.first_invoice_date
+    FROM base b
+    CROSS JOIN metadata m
+    WHERE b.customer IN (
+        SELECT customer
+        FROM base
+        WHERE billing_date >= m.max_billing_date - INTERVAL '3 months'
+    )
+    GROUP BY b.customer, b.currency, m.latest_year
 )
 SELECT
     customer,
-CAST(CAST(first_invoice_date AS DATE) AS VARCHAR) AS first_invoice_date,
-CAST(CAST(latest_invoice_date AS DATE) AS VARCHAR) AS latest_invoice_date,
+    CAST(first_invoice_date AS DATE)::VARCHAR AS first_invoice_date,
+    CAST(latest_invoice_date AS DATE)::VARCHAR AS latest_invoice_date,
     currency,
     invoice_ytd,
     sku_quantity_ytd,
@@ -192,7 +176,6 @@ CAST(CAST(latest_invoice_date AS DATE) AS VARCHAR) AS latest_invoice_date,
 FROM aggregated
 ORDER BY revenue_ytd DESC;
 ```
-
 
 <DataTable 
     data={customer_level}
