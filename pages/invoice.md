@@ -29,50 +29,23 @@ title: Invoice Insights Dashboard
 
 
 ```sql year
-WITH max_date AS (
-    SELECT MAX(CAST(invoice_date AS TIMESTAMP)) AS max_billing_date
-    FROM manu
-)
 SELECT
     CAST(EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP)) AS VARCHAR) AS year
 FROM manu
-WHERE sales_quantity > 0
-  AND CAST(EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP)) AS VARCHAR) LIKE '${inputs.year.value}'
-  AND invoice_date >= (
-      SELECT max_billing_date - INTERVAL '3 months'
-      FROM max_date
-  )
 GROUP BY year
 ORDER BY year DESC;
 ```
 
 ```sql material_group
-WITH max_date AS (
-    SELECT MAX(CAST(invoice_date AS TIMESTAMP)) AS max_billing_date
-    FROM manu
-)
 SELECT material_group
 FROM manu
-WHERE material_group IS NOT NULL
-  AND invoice_date >= (
-      SELECT max_billing_date - INTERVAL '3 months'
-      FROM max_date
-  )
 GROUP BY material_group
 ORDER BY material_group;
 ```
 
 ```sql payment_term_description            
-WITH max_date AS (
-    SELECT MAX(CAST(invoice_date AS TIMESTAMP)) AS max_billing_date
-    FROM manu
-)
 SELECT payment_term_description
 FROM manu
-WHERE invoice_date >= (
-      SELECT max_billing_date - INTERVAL '3 months'
-      FROM max_date
-  )
 GROUP BY payment_term_description
 ORDER BY payment_term_description;
 ```
@@ -80,31 +53,15 @@ ORDER BY payment_term_description;
 
 
 ```sql sku
-WITH max_date AS (
-    SELECT MAX(CAST(invoice_date AS TIMESTAMP)) AS max_billing_date
-    FROM manu
-)
 SELECT material_description
 FROM manu
-WHERE invoice_date >= (
-      SELECT max_billing_date - INTERVAL '3 months'
-      FROM max_date
-  )
 GROUP BY material_description
 ORDER BY material_description;
 ``` 
 
 ```sql customer
-WITH max_date AS (
-    SELECT MAX(CAST(invoice_date AS TIMESTAMP)) AS max_billing_date
-    FROM manu
-)
 SELECT customer_name
 FROM manu
-WHERE invoice_date >= (
-      SELECT max_billing_date - INTERVAL '3 months'
-      FROM max_date
-  )
 GROUP BY customer_name
 ORDER BY customer_name;
 ``` 
