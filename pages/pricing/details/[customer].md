@@ -85,8 +85,7 @@ ORDER BY total_revenue DESC;
 
 
 ```sql sku_summary
-WITH filtered_data AS (
-    SELECT
+SELECT
         customer_name AS customer,
         country_name AS country,
         material_description AS sku,
@@ -108,8 +107,6 @@ WITH filtered_data AS (
   AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
   AND material_group LIKE '${inputs.material_group.value}'
   AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-)
-SELECT * FROM filtered_data;
 ```
 
 <center>
@@ -314,6 +311,8 @@ WHERE customer_name = '${params.customer}'
 GROUP BY invoice_date, material_description, unit_price
 ORDER BY sku, date asc
 ```
+
+
 ### Customer SKU Pricing Over Time
 <LineChart
 data={price_comparison_table}
@@ -397,22 +396,22 @@ FROM with_delay
 ORDER BY purchase_invoice_date;
 ```
 
-```sql avg_qty_per_sku
-SELECT
-  CAST(invoice_date AS DATE) AS billing_date,
-  material_description AS sku,
-  AVG(sales_quantity) AS average_quantity
-FROM Clickhouse.manu
-WHERE sales_quantity > 0
-  AND customer_name = '${params.customer}'
-  AND material_description LIKE '${inputs.sku.value}'
-  AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-  AND material_group LIKE '${inputs.material_group.value}'
-  AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-  AND sales_quantity IS NOT NULL  -- ✅ Ensure sales_quantity is not NULL
-GROUP BY billing_date, material_description
-ORDER BY billing_date;
 
+```sql avg_qty_per_sku
+-- Monthly Average Quantity per SKU - aggregated to month level for cleaner line charts
+SELECT   
+    DATE_TRUNC('month', CAST(invoice_date AS TIMESTAMP)) AS billing_month,
+    AVG(sales_quantity) AS average_quantity 
+FROM Clickhouse.manu 
+WHERE sales_quantity > 0   
+    AND customer_name = '${params.customer}'   
+    AND material_description LIKE '${inputs.sku.value}'   
+    AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
+    AND material_group LIKE '${inputs.material_group.value}'
+    AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
+GROUP BY 
+    DATE_TRUNC('month', CAST(invoice_date AS TIMESTAMP))
+ORDER BY billing_month;
 ```
 
 <Grid cols=2>
@@ -424,7 +423,7 @@ ORDER BY billing_date;
 
 <LineChart
 data={avg_qty_per_sku}
-x=billing_date
+x=billing_month
 y=average_quantity
 chartAreaHeight=220
 yAxisTitle="Avg Qty per SKU"
