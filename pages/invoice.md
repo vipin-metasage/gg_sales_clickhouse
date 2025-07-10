@@ -68,7 +68,6 @@ ORDER BY customer_name;
 
 
 ```sql customer_level
-WITH base AS (
     SELECT
         customer_name AS customer,
         material_number AS sku_id,
@@ -82,86 +81,14 @@ WITH base AS (
         shipping_term AS incoterms_part1,
         material_group AS material_group_desc
     FROM manu
-    WHERE sales_quantity > 0
-    AND material_group LIKE '${inputs.material_group.value}'
-    AND payment_term_description LIKE '${inputs.payment_term_description.value}'
-    AND material_description LIKE '${inputs.sku.value}'
-    AND customer_name LIKE '${inputs.customer.value}'
-    AND CAST(EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP)) AS VARCHAR) LIKE '${inputs.year.value}'
-),
-year_ref AS (
-    SELECT MAX(CAST(EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP)) AS VARCHAR)) AS latest_year
-    FROM manu
-),
-max_date AS (
-    SELECT MAX(CAST(invoice_date AS TIMESTAMP)) AS max_billing_date
-    FROM manu
-),
-active_customers AS (
-    SELECT DISTINCT customer
-    FROM base
-    WHERE billing_date >= (
-        SELECT max_billing_date - INTERVAL '3 months'
-        FROM max_date
-    )
-),
-latest_invoice_dates AS (
-    SELECT customer, MAX(billing_date) AS latest_invoice_date
-    FROM base
-    GROUP BY customer
-),
-first_invoice_dates AS (
-    SELECT customer, MIN(billing_date) AS first_invoice_date
-    FROM base
-    GROUP BY customer
-),
-aggregated AS (
-    SELECT
-        ac.customer,
-        lid.latest_invoice_date,
-        fid.first_invoice_date,
-        ANY_VALUE(b.currency) AS currency,
-        COUNT(DISTINCT CASE WHEN b.billing_year = (SELECT latest_year FROM year_ref) THEN b.billing_document END) AS invoice_ytd,
-        SUM(CASE WHEN b.billing_year = (SELECT latest_year FROM year_ref) THEN b.billing_qty ELSE 0 END) AS sku_quantity_ytd,
-        SUM(CASE WHEN b.billing_year = (SELECT latest_year FROM year_ref) THEN b.total_amount ELSE 0 END) AS revenue_ytd,
-        COUNT(DISTINCT b.billing_document) AS total_invoices,
-        SUM(b.billing_qty) AS sku_quantity,
-        SUM(b.total_amount) AS total_revenue
-    FROM active_customers ac
-    JOIN base b ON b.customer = ac.customer
-    JOIN latest_invoice_dates lid ON lid.customer = ac.customer
-    JOIN first_invoice_dates fid ON fid.customer = ac.customer
-    GROUP BY ac.customer, lid.latest_invoice_date, fid.first_invoice_date
-)
-SELECT
-    customer,
-CAST(CAST(first_invoice_date AS DATE) AS VARCHAR) AS first_invoice_date,
-CAST(CAST(latest_invoice_date AS DATE) AS VARCHAR) AS latest_invoice_date,
-    currency,
-    invoice_ytd,
-    sku_quantity_ytd,
-    revenue_ytd,
-    total_invoices,
-    sku_quantity,
-    total_revenue
-FROM aggregated
-ORDER BY revenue_ytd DESC;
+    limit 100
 ```
+
+
 
 <DataTable 
     data={customer_level}
     subtitle="Only customers invoiced in the last 3 months are included"
     rows=15
     wrapTitles=true
->
-    <Column id="customer" title="Customer" align="left" />
-    <Column id="first_invoice_date" title="First Invoice" align="center" />
-    <Column id="latest_invoice_date" title="Latest Invoice" align="center" />
-    <Column id="currency" title="Currency" align="center" />
-    <Column id="invoice_ytd" title="Invoices" align="center" colGroup="YTD"/>
-    <Column id="sku_quantity_ytd" title="SKU Quantity" align="center" colGroup="YTD"/>
-    <Column id="revenue_ytd" title="Revenue" fmt="num0K" align="center" colGroup="YTD"/>
-    <Column id="total_invoices" title="Invoices" align="center" colGroup="Total"/>
-    <Column id="sku_quantity" title="SKU Quantity" align="center" colGroup="Total"/>
-    <Column id="total_revenue" title="Revenue" fmt="num0K" align="center" colGroup="Total"/>
-</DataTable>
+/>
