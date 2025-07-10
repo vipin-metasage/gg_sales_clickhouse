@@ -186,8 +186,7 @@ CAST(CAST(latest_invoice_date AS DATE) AS VARCHAR) AS latest_invoice_date,
     revenue_ytd,
     total_invoices,
     sku_quantity,
-    total_revenue,
-    '/pricing/details/' || customer AS detail_link
+    total_revenue
 FROM aggregated
 ORDER BY revenue_ytd DESC;
 ```
