@@ -7,7 +7,6 @@ SELECT
     invoice_quantity AS sales_quantity,
     sales_unit,
     unit,
-    units_per_sales_unit,
     requested_quantity,
     net_value,
     unit_price,

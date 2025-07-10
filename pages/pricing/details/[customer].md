@@ -87,7 +87,6 @@ ORDER BY total_revenue DESC;
 ```sql sku_summary
 SELECT
         customer_name AS customer,
-        country_name AS country,
         material_description AS sku,
         CAST(CAST(invoice_date AS DATE) AS VARCHAR) AS invoice_date,
         invoice_number,
@@ -479,7 +478,7 @@ WITH agg AS (
     invoice_number,
     MAX(CAST(invoice_date AS DATE)) AS billing_date,
     SUM(total_amount) AS invoice_amount,
-    SUM(invoice_quantity) AS billing_qty,
+    SUM(invoice_quantity) AS invoice_quantity,
     MAX(payment_term_description) AS payment_term_desc,
     MAX(customer_name) AS customer,
     MAX(amount_paid) AS paid_amount,
@@ -506,7 +505,7 @@ SELECT
   billing_date,
   invoice_number AS billing_document,
   invoice_amount,
-  billing_qty,
+  invoice_quantity,
   payment_term_desc,
   customer,
   paid_amount,
@@ -555,7 +554,7 @@ ORDER BY billing_date DESC;
   <Column id="billing_date" title="Date" align="center" />
   <Column id="billing_document" title="Billing Document" fmt="id" align="center" />
   <Column id="invoice_amount" title="Invoice Amount" fmt="num1k" align="center" />
-  <Column id="billing_qty" title="Qty" fmt="num" align="center" />
+  <Column id="invoice_quantity" title="Qty" fmt="num" align="center" />
   <Column id="payment_term_desc" title="Payment Term" align="center" />
   <Column id="paid_amount" title="Paid Amount" fmt="num1k" align="center" />
   <Column id="payment_status" title="Payment Status" align="center" />
