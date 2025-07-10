@@ -69,17 +69,7 @@ ORDER BY customer_name;
 
 ```sql customer_level
     SELECT
-        customer_name AS customer,
-        material_number AS sku_id,
-        invoice_date AS billing_date,
-        invoice_number AS billing_document,
-        total_amount,
-        sales_quantity AS billing_qty,
-        document_currency AS currency,
-        CAST(EXTRACT(YEAR FROM CAST(invoice_date AS TIMESTAMP)) AS VARCHAR) AS billing_year,
-        unit_price,
-        shipping_term AS incoterms_part1,
-        material_group AS material_group_desc
+        customer_name AS customer
     FROM manu
     limit 100
 ```
