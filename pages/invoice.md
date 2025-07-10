@@ -64,15 +64,11 @@ SELECT customer_name
 FROM manu
 GROUP BY customer_name
 ORDER BY customer_name;
-``` 
-
-```sql price_comparison_table
-SELECT * from Clickhouse.test2
 ```
 
 
 ```sql customer_level
-SELECT * from Clickhouse.test3
+SELECT * from Clickhouse.invoice
 ```
 <DataTable 
     data={customer_level}

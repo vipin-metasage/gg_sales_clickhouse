@@ -1,25 +1,19 @@
 SELECT
     invoice_number,
-    invoice_item_number,
     invoice_date,
     customer_name,
-    country_name,
     document_currency,
     freight_charges,
-    invoice_type,
     invoice_quantity AS sales_quantity,
     sales_unit,
     unit,
     units_per_sales_unit,
-    invoice_quantity,
     requested_quantity,
     net_value,
     unit_price,
     tax_amount,
     total_amount,
-    shipping_term,
     shipping_term_details,
-    material_number,
     material_description,
     payment_term_description,
     baseline_date,
@@ -31,4 +25,4 @@ SELECT
     material_group,
     dateDiff('day', baseline_date, payment_date) AS delay_days
 FROM manufacturing.analytics
-where invoice_date >= '2015-01-01';
+where invoice_date >= '2023-01-01';

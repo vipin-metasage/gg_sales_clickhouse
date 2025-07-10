@@ -7,9 +7,7 @@ SELECT
     
     -- YTD calculations for the latest year in the dataset
     countIf(DISTINCT invoice_number, toYear(invoice_date) = (SELECT MAX(toYear(invoice_date)) FROM manufacturing.analytics WHERE invoice_date >= '2015-01-01')) AS invoice_ytd,
-    
     sumIf(invoice_quantity, toYear(invoice_date) = (SELECT MAX(toYear(invoice_date)) FROM manufacturing.analytics WHERE invoice_date >= '2015-01-01')) AS sku_quantity_ytd,
-    
     sumIf(total_amount, toYear(invoice_date) = (SELECT MAX(toYear(invoice_date)) FROM manufacturing.analytics WHERE invoice_date >= '2015-01-01')) AS revenue_ytd,
     
     -- Total calculations
