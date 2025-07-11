@@ -4,83 +4,10 @@
 
 </center>
 
-```sql customer_metrics
-WITH base AS (
-    SELECT
-        customer_name AS customer,
-        invoice_number,
-        CAST(CAST(invoice_date AS DATE) AS VARCHAR) AS invoice_date,
-        sales_quantity,
-        total_amount,
-        outstanding_amount,
-        payment_status,
-        CAST(baseline_date AS DATE) AS baseline_date,
-        CAST(payment_date AS DATE) AS clearing_date,
-        CAST(payment_days AS INTEGER) AS payment_days,
 
-        -- ✅ Due Date
-        (CAST(baseline_date AS DATE) + CAST(payment_days AS INTEGER) * INTERVAL '1' DAY)::DATE AS due_date,
-
-        -- ✅ Delay Days with corrected logic
-        CASE
-            WHEN payment_status = 'Clear' THEN
-                DATE_DIFF('day', (CAST(baseline_date AS DATE) + CAST(payment_days AS INTEGER) * INTERVAL '1' DAY)::DATE, CAST(payment_date AS DATE))
-            WHEN payment_status = 'Open' THEN
-                DATE_DIFF('day', (CAST(baseline_date AS DATE) + CAST(payment_days AS INTEGER) * INTERVAL '1' DAY)::DATE, CURRENT_DATE)
-            ELSE NULL
-        END AS delay_days
-
-    FROM Clickhouse.manu
-    WHERE sales_quantity > 0
-      AND customer_name = '${params.customer}'
-      AND material_description LIKE '${inputs.sku.value}'
-      AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-      AND material_group LIKE '${inputs.material_group.value}'
-      AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-),
-
-customer_summary AS (
-    SELECT
-        customer,
-        COUNT(DISTINCT invoice_number) AS total_orders,
-        SUM(sales_quantity) AS total_quantity,
-        SUM(sales_quantity) * 1.0 / COUNT(DISTINCT invoice_number) AS avg_order_quantity,
-        SUM(total_amount) AS total_revenue,
-        MIN(invoice_date) AS first_order_date,
-        MAX(invoice_date) AS last_order_date,
-
-        -- ✅ Delay logic applied correctly
-        COUNT(DISTINCT CASE 
-            WHEN payment_status IN ('Clear', 'Open') AND delay_days > 0 
-            THEN invoice_number 
-        END) AS payment_delayed_orders,
-
-        -- ✅ Only consider numeric delay > 0 for averages
-        AVG(CASE 
-            WHEN payment_status IN ('Clear', 'Open') AND delay_days > 0 
-            THEN delay_days 
-        END) AS avg_payment_delay_days,
-
-        SUM(outstanding_amount) AS total_outstanding_amount
-
-    FROM base
-    GROUP BY customer
-)
-
-SELECT 
-    customer,
-    total_orders,
-    total_quantity,
-    ROUND(avg_order_quantity, 2) AS avg_order_quantity,
-    ROUND(total_revenue, 2) AS total_revenue,
-    CAST(CAST(first_order_date AS DATE) AS VARCHAR) AS first_order_date,
-    CAST(CAST(last_order_date AS DATE) AS VARCHAR) AS last_order_date,
-    payment_delayed_orders,
-    ROUND(total_outstanding_amount, 2) AS total_outstanding_amount,
-    ROUND(avg_payment_delay_days, 2) AS avg_payment_delay_days
-
-FROM customer_summary
-ORDER BY total_revenue DESC;
+```sql customer_kpi
+select * from Clickhouse.kpi
+where customer = '${params.customer}'
 ```
 
 
@@ -132,19 +59,19 @@ SELECT
 
 <Grid cols=3>
     <BigValue 
-        data={customer_metrics} 
+        data={customer_kpi} 
         value=total_orders
         title="Total Orders"
         fmt=num0
     />
     <BigValue 
-        data={customer_metrics} 
+        data={customer_kpi} 
         value=total_quantity
         title="Total Quantity"
         fmt=num0
     />
     <BigValue 
-        data={customer_metrics} 
+        data={customer_kpi} 
         value=avg_order_quantity
         title="Average Order Quantity"
         fmt=num0
@@ -154,18 +81,18 @@ SELECT
 
 <Grid cols=3>
     <BigValue 
-        data={customer_metrics} 
+        data={customer_kpi} 
         value=total_revenue
         title="Total Revenue"
         fmt=num0
     />
     <BigValue 
-        data={customer_metrics} 
+        data={customer_kpi} 
         value=first_order_date
         title="First Order Date"
     />
     <BigValue 
-        data={customer_metrics} 
+        data={customer_kpi} 
         value=last_order_date
         title="Last Order Date"
     />
@@ -173,21 +100,21 @@ SELECT
 
 <Grid cols=3>
     <BigValue 
-        data={customer_metrics} 
+        data={customer_kpi} 
         value=payment_delayed_orders
         title="Payment Delayed Orders"
         fmt=num0
     />
 
 <BigValue 
-        data={customer_metrics} 
+        data={customer_kpi} 
         value=total_outstanding_amount
         title="Outstanding Payment"
         fmt=num0
     />
 
 <BigValue 
-        data={customer_metrics} 
+        data={customer_kpi} 
         value=avg_payment_delay_days
         title="Average Payment Delay (Days)"
         fmt=num0
@@ -248,19 +175,13 @@ ORDER BY year DESC;
 
 
 ```sql avg_qty_per_order_over_time
-SELECT
-    DATE_TRUNC('month', CAST(invoice_date AS TIMESTAMP)) AS month,
-    SUM(sales_quantity) * 1.0 / COUNT(DISTINCT invoice_number) AS avg_qty_per_order
-FROM manu
-WHERE sales_quantity > 0
-  AND customer_name = '${params.customer}'
-  AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-  AND material_group LIKE '${inputs.material_group.value}'
-  AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-  AND material_description LIKE '${inputs.sku.value}'
-  AND material_group LIKE '${inputs.material_group.value}'
-GROUP BY month
+SELECT 
+    CAST(month AS DATE) AS month,
+    avg_qty_per_order,customer_name
+FROM Clickhouse.order_qty_time
+where customer_name = '${params.customer}'
 ORDER BY month;
+
 ```
 
 ```sql payment_kpi
@@ -276,21 +197,6 @@ WHERE sales_quantity > 0
   AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
   AND material_group LIKE '${inputs.material_group.value}'
   AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-```
-
-```sql revenue_and_quantity_over_time
-SELECT
-    DATE_TRUNC('month', CAST(invoice_date AS TIMESTAMP)) AS month,
-    SUM(total_amount) AS revenue,
-    SUM(sales_quantity) AS quantity
-FROM manu
-WHERE sales_quantity > 0
-  AND customer_name = '${params.customer}'
-  AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-  AND material_group LIKE '${inputs.material_group.value}'
-  AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-GROUP BY month
-ORDER BY month
 ```
 
 
@@ -335,80 +241,16 @@ colorPalette={[
 
 
 ```sql scatter_plot
-WITH agg AS (
-  SELECT
-    invoice_number,
-    MAX(CAST(invoice_date AS DATE)) AS purchase_invoice_date,
-    SUM(total_amount) AS invoice_amount,
-    MAX(CAST(baseline_date AS DATE)) AS baseline_date,
-    MAX(CAST(payment_date AS DATE)) AS clearing_date,
-    MAX(CAST(payment_days AS INT)) AS payment_days,
-    MAX(payment_status) AS raw_status,
-    MAX(amount_paid) AS paid_amount
-  FROM manu
-  WHERE
-    sales_quantity > 0
-    AND customer_name = '${params.customer}'
-    AND material_description LIKE '${inputs.sku.value}'
-    AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-    AND material_group LIKE '${inputs.material_group.value}'
-    AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-  GROUP BY invoice_number
-),
-
-with_delay AS (
-  SELECT
-    *,
-    -- ✅ Due Date
-    (baseline_date + payment_days * INTERVAL '1' DAY)::DATE AS due_date,
-
-    -- ✅ Accurate Delay Days
-    CASE 
-      WHEN raw_status = 'Clear' THEN 
-        DATE_DIFF('day', (baseline_date + payment_days * INTERVAL '1' DAY)::DATE, clearing_date)
-      ELSE 
-        DATE_DIFF('day', (baseline_date + payment_days * INTERVAL '1' DAY)::DATE, CURRENT_DATE)
-    END AS delay_days
-  FROM agg
-)
-
-SELECT
-  invoice_number AS billing_document,
-  purchase_invoice_date,
-  invoice_amount,
-  due_date,
-  clearing_date,
-  delay_days,
-
-  -- ✅ Final Payment Status
-  CASE 
-    WHEN paid_amount > 0 AND raw_status = 'Open' THEN 'Open'
-    WHEN raw_status = 'Clear' AND delay_days <= 0 THEN 'Early Paid'
-    WHEN raw_status = 'Clear' AND delay_days > 0 THEN 'Delay Paid'
-    WHEN paid_amount = 0 AND raw_status != 'Clear' THEN 'Unpaid'
-    ELSE 'Unknown'
-  END AS payment_status
-
-FROM with_delay
-ORDER BY purchase_invoice_date;
+select * from Clickhouse.scatter_plot
+where customer_name = '${params.customer}'
 ```
 
 
 ```sql avg_qty_per_sku
--- Monthly Average Quantity per SKU - aggregated to month level for cleaner line charts
-SELECT   
-    DATE_TRUNC('month', CAST(invoice_date AS TIMESTAMP)) AS billing_month,
-    AVG(sales_quantity) AS average_quantity 
-FROM Clickhouse.manu 
-WHERE sales_quantity > 0   
-    AND customer_name = '${params.customer}'   
-    AND material_description LIKE '${inputs.sku.value}'   
-    AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-    AND material_group LIKE '${inputs.material_group.value}'
-    AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-GROUP BY 
-    DATE_TRUNC('month', CAST(invoice_date AS TIMESTAMP))
-ORDER BY billing_month;
+   
+select CAST(month AS DATE) AS month,average_quantity from Clickhouse.order_qty_time
+where customer_name = '${params.customer}'
+order by month
 ```
 
 <Grid cols=2>
@@ -420,7 +262,7 @@ ORDER BY billing_month;
 
 <LineChart
 data={avg_qty_per_sku}
-x=billing_month
+x=month
 y=average_quantity
 chartAreaHeight=220
 yAxisTitle="Avg Qty per SKU"
