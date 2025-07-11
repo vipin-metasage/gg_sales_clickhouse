@@ -24,4 +24,4 @@ SELECT
     material_group,
     dateDiff('day', baseline_date, payment_date) AS delay_days
 FROM manufacturing.analytics
-where invoice_date >= '2023-01-01';
+where invoice_date >= '2025-01-01';
