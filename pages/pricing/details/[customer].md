@@ -35,7 +35,7 @@ SELECT *
 <DropdownOption value="%" valueLabel="All Years"/>
 </Dropdown>
 
-<Dropdown data={material_group} name=material_group value=material_group defaultValue='%' title="Material Group">
+<Dropdown data={material_group_desc} name=material_group_desc value=material_group_desc defaultValue='%' title="Material Group">
   <DropdownOption value="%" valueLabel="All"/>
 </Dropdown>
 
@@ -122,11 +122,11 @@ SELECT *
 
 ```sql material_group
 SELECT
-    material_group
+    material_group_desc
 FROM Clickhouse.sku
 WHERE customer = '${params.customer}'
-GROUP BY material_group
-ORDER BY material_group
+GROUP BY material_group_desc
+ORDER BY materialmaterial_group_desc_group
 ```
 
 ```sql payment_term_desc
