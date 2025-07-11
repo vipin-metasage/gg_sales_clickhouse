@@ -120,13 +120,13 @@ SELECT *
 
 
 
-```sql material_group
+```sql material_group_desc
 SELECT
     material_group_desc
 FROM Clickhouse.sku
 WHERE customer = '${params.customer}'
 GROUP BY material_group_desc
-ORDER BY materialmaterial_group_desc_group
+ORDER BY material_group_desc
 ```
 
 ```sql payment_term_desc
