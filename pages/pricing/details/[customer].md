@@ -4,8 +4,6 @@
 
 </center>
 
-
-
 ```sql kpi
 SELECT
   customer,
@@ -125,7 +123,7 @@ SELECT *
 ```sql material_group
 SELECT
     material_group
-FROM Clickhouse.manu
+FROM Clickhouse.sku
 WHERE customer_name = '${params.customer}'
 GROUP BY material_group
 ORDER BY material_group
@@ -143,8 +141,8 @@ ORDER BY payment_term_desc
 ```sql sku  
   select
       material_description as sku
-  from Clickhouse.manu
-  where customer_name = '${params.customer}'
+  from Clickhouse.sku
+  where customer = '${params.customer}'
   group by material_description
 ```
 
@@ -179,12 +177,8 @@ SELECT
     CAST(invoice_date AS DATE) AS date,
     material_description AS sku,
     AVG(unit_price) AS unit_price
-FROM manu
-WHERE customer_name = '${params.customer}'
-  AND material_description LIKE '${inputs.sku.value}'
-  AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-  AND material_group LIKE '${inputs.material_group.value}'
-  AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
+FROM Clickhouse.sku
+WHERE customer = '${params.customer}'
 GROUP BY invoice_date, material_description, unit_price
 ORDER BY sku, date asc
 ```
@@ -286,76 +280,6 @@ yFmt=num0k
 </DataTable>
 
 
-```sql order_payment_details
-WITH agg AS (
-  SELECT
-    invoice_number,
-    MAX(CAST(invoice_date AS DATE)) AS billing_date,
-    SUM(total_amount) AS invoice_amount,
-    SUM(sales_quantity) AS sales_quantity,
-    MAX(payment_term_description) AS payment_term_desc,
-    MAX(customer_name) AS customer,
-    MAX(amount_paid) AS paid_amount,
-    MAX(payment_status) AS payment_status,
-
-    -- keep original casting logic
-    MAX(CAST(payment_date AS DATE)) AS clearing_date,
-    MAX(CAST(baseline_date AS DATE)) AS baseline_date,
-
-    CAST(MAX(payment_days) AS INTEGER) AS cash_discount_days_1,
-    MAX(material_group) AS material_group,
-    MAX(outstanding_amount) AS unpaid_amount
-  FROM Clickhouse.manu
-  WHERE 
-    customer_name = '${params.customer}'
-    AND material_description LIKE '${inputs.sku.value}'
-    AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-    AND material_group LIKE '${inputs.material_group.value}'
-    AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-  GROUP BY invoice_number
-)
-
-SELECT
-  billing_date,
-  invoice_number AS billing_document,
-  invoice_amount,
-  sales_quantity,
-  payment_term_desc,
-  customer,
-  paid_amount,
-  payment_status,
-
-  -- ✅ Blank clearing_date for Open or 1970 cases
-  CASE 
-    WHEN payment_status = 'Open' THEN NULL
-    WHEN CAST(clearing_date AS TEXT) = '1970-01-01' THEN NULL
-    ELSE CAST(clearing_date AS TEXT)
-  END AS clearing_date,
-
-  -- ✅ Baseline date cleanup
-  CASE 
-    WHEN CAST(baseline_date AS TEXT) = '1970-01-01' THEN NULL
-    ELSE CAST(baseline_date AS TEXT)
-  END AS baseline_date,
-
-  cash_discount_days_1,
-
-  -- ✅ Due Date
-  (baseline_date + cash_discount_days_1 * INTERVAL '1' DAY)::DATE AS due_date,
-
-  -- ✅ Delay Days
-  CASE 
-    WHEN payment_status = 'Clear' THEN 
-      DATE_DIFF('day', (baseline_date + cash_discount_days_1 * INTERVAL '1' DAY)::DATE, clearing_date)
-    ELSE 
-      DATE_DIFF('day', (baseline_date + cash_discount_days_1 * INTERVAL '1' DAY)::DATE, CURRENT_DATE)
-  END AS delay_days,
-
-  unpaid_amount
-
-FROM agg
-ORDER BY billing_date DESC;
-```
 
 ```sql payment_details
 select * from Clickhouse.payment
