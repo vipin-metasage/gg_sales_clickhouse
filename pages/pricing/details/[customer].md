@@ -13,7 +13,7 @@ SELECT
   ROUND(AVG(sales_quantity)) AS avg_order_quantity,
   MIN(CAST(billing_date AS DATE)) AS first_order_date,
   MAX(CAST(billing_date AS DATE)) AS last_order_date,
-  COUNT(*) FILTER (WHERE CAST(delay_days AS INT) > 0) AS payment_delayed_orders,
+  COUNT(billing_document) FILTER (WHERE CAST(delay_days AS INT) > 0) AS payment_delayed_orders,
   SUM(unpaid_amount) AS outstanding_payment,
   ROUND(AVG(CASE 
     WHEN payment_status IN ('Clear', 'Open') AND CAST(delay_days AS INT) > 0 
@@ -124,7 +124,7 @@ SELECT *
 SELECT
     material_group
 FROM Clickhouse.sku
-WHERE customer_name = '${params.customer}'
+WHERE customer = '${params.customer}'
 GROUP BY material_group
 ORDER BY material_group
 ```
@@ -140,10 +140,10 @@ ORDER BY payment_term_desc
 
 ```sql sku  
   select
-      material_description as sku
+      sku
   from Clickhouse.sku
   where customer = '${params.customer}'
-  group by material_description
+  group by sku
 ```
 
 ```sql customer
@@ -175,11 +175,11 @@ ORDER BY month;
 ```sql price_comparison_table
 SELECT
     CAST(invoice_date AS DATE) AS date,
-    material_description AS sku,
+    sku ,
     AVG(unit_price) AS unit_price
 FROM Clickhouse.sku
 WHERE customer = '${params.customer}'
-GROUP BY invoice_date, material_description, unit_price
+GROUP BY invoice_date, sku, unit_price
 ORDER BY sku, date asc
 ```
 
@@ -259,7 +259,6 @@ yFmt=num0k
 </div>
 
 </Grid>
-
 
 ### 📅 SKU Historical Pricing
 

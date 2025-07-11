@@ -9,11 +9,11 @@ title: Invoice Insights Dashboard
     <DropdownOption value="%" valueLabel="All"/>
 </Dropdown>
 
-<Dropdown data={payment_term_description} name=payment_term_description value=payment_term_description defaultValue='%' title="Payment Term">
+<Dropdown data={payment_term_desc} name=payment_term_desc value=payment_term_desc defaultValue='%' title="Payment Term">
   <DropdownOption value="%" valueLabel="All"/>
 </Dropdown>
 
-<Dropdown data={customer} name=customer value=customer_name defaultValue='%' title="Customer">
+<Dropdown data={customer} name=customer value=customer defaultValue='%' title="Customer">
   <DropdownOption value="%" valueLabel="All"/>
 </Dropdown>
 
@@ -30,18 +30,18 @@ ORDER BY year DESC;
 
 ```
 
-```sql payment_term_description            
+```sql payment_term_desc            
 SELECT payment_term_desc
 FROM Clickhouse.payment
-GROUP BY payment_term_description
-ORDER BY payment_term_description;
+GROUP BY payment_term_desc
+ORDER BY payment_term_desc;
 ```
 
 ```sql customer
-SELECT customer_name
+SELECT customer
 FROM Clickhouse.invoice
-GROUP BY customer_name
-ORDER BY customer_name;
+GROUP BY customer
+ORDER BY customer;
 ```
 
 

@@ -11,4 +11,4 @@ SELECT
         payment_term_description AS payment_term_desc,
         material_group AS material_group_desc
     FROM manufacturing.analytics
-    WHERE invoice_date >= '2015-01-01'
+    WHERE invoice_date >= '2020-01-01'
