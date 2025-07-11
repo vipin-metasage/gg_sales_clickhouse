@@ -5,32 +5,30 @@
 </center>
 
 
-```sql customer_kpi
-select * from Clickhouse.kpi
-where customer = '${params.customer}'
+
+```sql kpi
+SELECT
+  customer,
+  COUNT(DISTINCT billing_document) AS total_orders,
+  SUM(invoice_amount) AS total_revenue,
+  SUM(sales_quantity) AS total_quantity,
+  ROUND(AVG(sales_quantity)) AS avg_order_quantity,
+  MIN(CAST(billing_date AS DATE)) AS first_order_date,
+  MAX(CAST(billing_date AS DATE)) AS last_order_date,
+  COUNT(*) FILTER (WHERE CAST(delay_days AS INT) > 0) AS payment_delayed_orders,
+  SUM(unpaid_amount) AS outstanding_payment,
+  ROUND(AVG(CASE 
+    WHEN payment_status IN ('Clear', 'Open') AND CAST(delay_days AS INT) > 0 
+    THEN CAST(delay_days AS INT) 
+  END), 2) AS avg_payment_delay_days
+FROM payment
+WHERE customer = '${params.customer}'
+GROUP BY customer;
 ```
 
-
 ```sql sku_summary
-SELECT
-        customer_name AS customer,
-        material_description AS sku,
-        CAST(CAST(invoice_date AS DATE) AS VARCHAR) AS invoice_date,
-        invoice_number,
-        total_amount,
-        sales_quantity AS billing_qty,
-        sales_unit,
-        document_currency AS doc_currency,
-        unit_price,
-        payment_term_description AS payment_term_desc,
-        material_group AS material_group_desc
-    FROM Clickhouse.manu
-    WHERE sales_quantity > 0
-  AND customer_name = '${params.customer}'
-  AND material_description LIKE '${inputs.sku.value}'
-  AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-  AND material_group LIKE '${inputs.material_group.value}'
-  AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
+SELECT *
+    FROM Clickhouse.sku
 ```
 
 <center>
@@ -59,19 +57,19 @@ SELECT
 
 <Grid cols=3>
     <BigValue 
-        data={customer_kpi} 
+        data={kpi} 
         value=total_orders
         title="Total Orders"
         fmt=num0
     />
     <BigValue 
-        data={customer_kpi} 
+        data={kpi} 
         value=total_quantity
         title="Total Quantity"
         fmt=num0
     />
     <BigValue 
-        data={customer_kpi} 
+        data={kpi} 
         value=avg_order_quantity
         title="Average Order Quantity"
         fmt=num0
@@ -81,18 +79,18 @@ SELECT
 
 <Grid cols=3>
     <BigValue 
-        data={customer_kpi} 
+        data={kpi} 
         value=total_revenue
         title="Total Revenue"
         fmt=num0
     />
     <BigValue 
-        data={customer_kpi} 
+        data={kpi} 
         value=first_order_date
         title="First Order Date"
     />
     <BigValue 
-        data={customer_kpi} 
+        data={kpi} 
         value=last_order_date
         title="Last Order Date"
     />
@@ -100,21 +98,21 @@ SELECT
 
 <Grid cols=3>
     <BigValue 
-        data={customer_kpi} 
+        data={kpi} 
         value=payment_delayed_orders
         title="Payment Delayed Orders"
         fmt=num0
     />
 
 <BigValue 
-        data={customer_kpi} 
-        value=total_outstanding_amount
+        data={kpi} 
+        value=outstanding_payment
         title="Outstanding Payment"
         fmt=num0
     />
 
 <BigValue 
-        data={customer_kpi} 
+        data={kpi} 
         value=avg_payment_delay_days
         title="Average Payment Delay (Days)"
         fmt=num0
@@ -129,17 +127,15 @@ SELECT
     material_group
 FROM Clickhouse.manu
 WHERE customer_name = '${params.customer}'
-    AND sales_quantity > 0
 GROUP BY material_group
 ORDER BY material_group
 ```
 
 ```sql payment_term_desc
 SELECT
-    payment_term_description as payment_term_desc
-FROM Clickhouse.manu
-WHERE customer_name = '${params.customer}'
-    AND sales_quantity > 0
+    payment_term_desc
+FROM Clickhouse.payment
+WHERE customer = '${params.customer}'  
 GROUP BY payment_term_desc
 ORDER BY payment_term_desc
 ```
@@ -149,30 +145,24 @@ ORDER BY payment_term_desc
       material_description as sku
   from Clickhouse.manu
   where customer_name = '${params.customer}'
-    AND sales_quantity > 0
   group by material_description
 ```
 
 ```sql customer
   select
-      customer_name as customer
-  from Clickhouse.manu
-  where customer_name = '${params.customer}'
-    AND sales_quantity > 0
-  group by customer_name
+       customer
+  from Clickhouse.invoice
+  where customer = '${params.customer}'
+  group by customer
 ```
-
 
 ```sql year
 SELECT
-  EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) AS year
-FROM Clickhouse.manu
-WHERE customer_name = '${params.customer}'
-  AND sales_quantity > 0
+  CAST(EXTRACT(YEAR FROM CAST(first_invoice_date AS DATE)) AS TEXT) AS year
+FROM Clickhouse.invoice
 GROUP BY year
 ORDER BY year DESC;
 ```
-
 
 ```sql avg_qty_per_order_over_time
 SELECT 
@@ -183,22 +173,6 @@ where customer_name = '${params.customer}'
 ORDER BY month;
 
 ```
-
-```sql payment_kpi
-SELECT
-  ROUND(AVG(CASE WHEN payment_status != 'Unpaid' AND payment_days > 0 THEN payment_days END), 2) AS average_positive_delay_days_for_paid,
-  SUM(CASE WHEN payment_status = 'Unpaid' THEN outstanding_amount ELSE 0 END) AS total_not_paid_amount,
-  ROUND(100.0 * SUM(CASE WHEN payment_status = 'Delay Paid' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN payment_status != 'Unpaid' THEN 1 ELSE 0 END), 0), 2) AS delay_rate_percent,
-  SUM(CASE WHEN payment_status = 'Delay Paid' THEN 1 ELSE 0 END) AS total_delay_orders,
-  SUM(CASE WHEN payment_status != 'Unpaid' THEN 1 ELSE 0 END) AS total_paid_orders
-FROM manu
-WHERE sales_quantity > 0
-  AND customer_name = '${params.customer}'
-  AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-  AND material_group LIKE '${inputs.material_group.value}'
-  AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-```
-
 
 ```sql price_comparison_table
 SELECT
@@ -383,10 +357,15 @@ FROM agg
 ORDER BY billing_date DESC;
 ```
 
+```sql payment_details
+select * from Clickhouse.payment
+where customer = '${params.customer}'
+```
+
 ### 📅 Order Payment Details
 
 <DataTable
-  data={order_payment_details}
+  data={payment_details}
   search={true}
   rows={15}
   wrapTitles={true}
