@@ -156,7 +156,7 @@ ORDER BY payment_term_desc
 
 ```sql year
 SELECT
-   EXTRACT(YEAR FROM first_invoice_date) AS year
+    EXTRACT(YEAR FROM CAST(first_invoice_date AS TIMESTAMP)) AS year
 FROM Clickhouse.invoice
 GROUP BY year
 ORDER BY year DESC;
