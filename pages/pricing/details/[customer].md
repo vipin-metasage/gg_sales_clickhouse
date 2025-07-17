@@ -27,6 +27,8 @@ GROUP BY customer;
 ```sql sku_summary
 SELECT *
     FROM Clickhouse.sku
+    where customer = '${params.customer}'
+    order by invoice_date desc
 ```
 
 <center>
