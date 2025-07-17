@@ -22,12 +22,10 @@ title: Invoice Insights Dashboard
 
 ```sql year
 SELECT
-  CAST(EXTRACT(YEAR FROM CAST(first_invoice_date AS DATE)) AS TEXT) AS year
+  EXTRACT(YEAR FROM first_invoice_date) AS year
 FROM Clickhouse.invoice
 GROUP BY year
 ORDER BY year DESC;
-
-
 ```
 
 ```sql payment_term_desc            

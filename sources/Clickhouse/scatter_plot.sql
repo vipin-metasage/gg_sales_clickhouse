@@ -13,7 +13,6 @@ WITH agg AS (
   WHERE toDate(invoice_date) > toDate('2015-01-01')
   GROUP BY invoice_number
 ),
-
 with_delay AS (
   SELECT
     *,
@@ -34,7 +33,7 @@ SELECT
   invoice_number AS billing_document,
   purchase_invoice_date,
   invoice_amount,
-  delay_days,  -- now guaranteed to be Int32
+  delay_days,
   CASE 
     WHEN paid_amount > 0 AND raw_status = 'Open' THEN 'Open'
     WHEN raw_status = 'Clear' AND delay_days <= 0 THEN 'Early Paid'

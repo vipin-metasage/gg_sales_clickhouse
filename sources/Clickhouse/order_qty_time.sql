@@ -5,7 +5,5 @@ SELECT
     AVG(invoice_quantity) AS average_quantity
 FROM manufacturing.analytics
 WHERE invoice_date >= '2015-01-01'
-GROUP BY 
-    customer_name,
-    DATE_TRUNC('month', CAST(invoice_date AS TIMESTAMP))
+GROUP BY customer_name, DATE_TRUNC('month', CAST(invoice_date AS TIMESTAMP))
 ORDER BY month;
