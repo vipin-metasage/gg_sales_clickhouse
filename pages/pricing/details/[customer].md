@@ -1,6 +1,7 @@
 <center>
 
 ## Pricing Summary for {params.customer}
+#### Cost excludes freight, processing, and shipment cost.
 
 </center>
 
@@ -17,6 +18,7 @@ WITH base AS (
         CAST(baseline_date AS DATE) AS baseline_date,
         CAST(payment_date AS DATE) AS clearing_date,
         CAST(payment_days AS INTEGER) AS payment_days,
+        cost,
 
         -- ✅ Due Date
         (CAST(baseline_date AS DATE) + CAST(payment_days AS INTEGER) * INTERVAL '1' DAY)::DATE AS due_date,
@@ -46,20 +48,26 @@ customer_summary AS (
         SUM(sales_quantity) AS total_quantity,
         SUM(sales_quantity) * 1.0 / COUNT(DISTINCT invoice_number) AS avg_order_quantity,
         SUM(total_amount) AS total_revenue,
+        SUM(cost) AS total_cost,
         MIN(invoice_date) AS first_order_date,
         MAX(invoice_date) AS last_order_date,
 
-        -- ✅ Delay logic applied correctly
+        -- ✅ Count of Delayed Payments
         COUNT(DISTINCT CASE 
             WHEN payment_status IN ('Clear', 'Open') AND delay_days > 0 
             THEN invoice_number 
         END) AS payment_delayed_orders,
 
-        -- ✅ Only consider numeric delay > 0 for averages
+        -- ✅ Average Delay Days
         AVG(CASE 
             WHEN payment_status IN ('Clear', 'Open') AND delay_days > 0 
             THEN delay_days 
         END) AS avg_payment_delay_days,
+
+        -- ✅ Count of Open Payment Status
+        COUNT(DISTINCT CASE 
+            WHEN payment_status = 'Open' THEN invoice_number 
+        END) AS open_payment_orders,
 
         SUM(outstanding_amount) AS total_outstanding_amount
 
@@ -73,11 +81,21 @@ SELECT
     total_quantity,
     ROUND(avg_order_quantity, 2) AS avg_order_quantity,
     ROUND(total_revenue, 2) AS total_revenue,
+    ROUND(total_cost, 2) AS total_cost,
     CAST(CAST(first_order_date AS DATE) AS VARCHAR) AS first_order_date,
     CAST(CAST(last_order_date AS DATE) AS VARCHAR) AS last_order_date,
     payment_delayed_orders,
     ROUND(total_outstanding_amount, 2) AS total_outstanding_amount,
-    ROUND(avg_payment_delay_days, 2) AS avg_payment_delay_days
+    ROUND(avg_payment_delay_days, 2) AS avg_payment_delay_days,
+    open_payment_orders,
+
+    -- ✅ Profit Margin %
+    ROUND(
+        CASE 
+            WHEN total_revenue > 0 THEN ((total_revenue - total_cost) / total_revenue)
+            ELSE 0 
+        END, 2
+    ) AS profit_margin_percent
 
 FROM customer_summary
 ORDER BY total_revenue DESC;
@@ -151,9 +169,9 @@ SELECT * FROM filtered_data;
     />
     <BigValue 
         data={customer_metrics} 
-        value=avg_order_quantity
-        title="Average Order Quantity"
-        fmt=num0
+        value=profit_margin_percent
+        title="Profit Margin %"
+        fmt=pct0
     />
 </Grid>
 
@@ -167,8 +185,8 @@ SELECT * FROM filtered_data;
     />
     <BigValue 
         data={customer_metrics} 
-        value=first_order_date
-        title="First Order Date"
+        value=open_payment_orders
+        title="Open Payment Orders"
     />
     <BigValue 
         data={customer_metrics} 
@@ -269,21 +287,6 @@ GROUP BY month
 ORDER BY month;
 ```
 
-```sql payment_kpi
-SELECT
-  ROUND(AVG(CASE WHEN payment_status != 'Unpaid' AND payment_days > 0 THEN payment_days END), 2) AS average_positive_delay_days_for_paid,
-  SUM(CASE WHEN payment_status = 'Unpaid' THEN outstanding_amount ELSE 0 END) AS total_not_paid_amount,
-  ROUND(100.0 * SUM(CASE WHEN payment_status = 'Delay Paid' THEN 1 ELSE 0 END) / NULLIF(SUM(CASE WHEN payment_status != 'Unpaid' THEN 1 ELSE 0 END), 0), 2) AS delay_rate_percent,
-  SUM(CASE WHEN payment_status = 'Delay Paid' THEN 1 ELSE 0 END) AS total_delay_orders,
-  SUM(CASE WHEN payment_status != 'Unpaid' THEN 1 ELSE 0 END) AS total_paid_orders
-FROM manu
-WHERE sales_quantity > 0
-  AND customer_name = '${params.customer}'
-  AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
-  AND material_group LIKE '${inputs.material_group.value}'
-  AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-```
-
 ```sql revenue_and_quantity_over_time
 SELECT
     DATE_TRUNC('month', CAST(invoice_date AS TIMESTAMP)) AS month,
@@ -314,6 +317,7 @@ WHERE customer_name = '${params.customer}'
 GROUP BY invoice_date, material_description, unit_price
 ORDER BY sku, date asc
 ```
+
 ### Customer SKU Pricing Over Time
 <LineChart
 data={price_comparison_table}
@@ -399,8 +403,7 @@ ORDER BY purchase_invoice_date;
 
 ```sql avg_qty_per_sku
 SELECT
-  CAST(invoice_date AS DATE) AS billing_date,
-  material_description AS sku,
+  date_trunc('month', CAST(invoice_date AS DATE)) AS billing_month,
   AVG(sales_quantity) AS average_quantity
 FROM Clickhouse.manu
 WHERE sales_quantity > 0
@@ -409,10 +412,9 @@ WHERE sales_quantity > 0
   AND EXTRACT(YEAR FROM CAST(invoice_date AS DATE)) LIKE '${inputs.year.value}'
   AND material_group LIKE '${inputs.material_group.value}'
   AND payment_term_description LIKE '${inputs.payment_term_desc.value}'
-  AND sales_quantity IS NOT NULL  -- ✅ Ensure sales_quantity is not NULL
-GROUP BY billing_date, material_description
-ORDER BY billing_date;
-
+  AND sales_quantity IS NOT NULL
+GROUP BY billing_month
+ORDER BY billing_month;
 ```
 
 <Grid cols=2>
@@ -424,7 +426,7 @@ ORDER BY billing_date;
 
 <LineChart
 data={avg_qty_per_sku}
-x=billing_date
+x=billing_month
 y=average_quantity
 chartAreaHeight=220
 yAxisTitle="Avg Qty per SKU"
@@ -435,6 +437,21 @@ yFmt=num0k
 </div>
 
 <div>
+
+### Average Order Quantity Over Time
+
+<LineChart
+data={avg_qty_per_order_over_time}
+x=month
+y=avg_qty_per_order
+yFmt=num0k
+chartAreaHeight=220
+yAxisTitle="Avg Qty per Order"
+/>  
+
+</div>
+
+</Grid>
 
 ### Invoice Amount vs Payment Delay by Payment Status
 
@@ -450,10 +467,6 @@ yFmt=num0k
 '#EF5350', // light red for unpaid
 ]}
 />
-</div>
-
-</Grid>
-
 
 ### 📅 SKU Historical Pricing
 
@@ -480,6 +493,7 @@ WITH agg AS (
     invoice_number,
     MAX(CAST(invoice_date AS DATE)) AS billing_date,
     SUM(total_amount) AS invoice_amount,
+    sum(net_value) AS net_value,
     SUM(invoice_quantity) AS billing_qty,
     MAX(payment_term_description) AS payment_term_desc,
     MAX(customer_name) AS customer,
@@ -492,7 +506,8 @@ WITH agg AS (
 
     CAST(MAX(payment_days) AS INTEGER) AS cash_discount_days_1,
     MAX(material_group) AS material_group,
-    MAX(outstanding_amount) AS unpaid_amount
+    MAX(outstanding_amount) AS unpaid_amount,
+    SUM(cost) AS total_cost  -- ✅ added cost aggregation
   FROM Clickhouse.manu
   WHERE 
     customer_name = '${params.customer}'
@@ -539,7 +554,16 @@ SELECT
       DATE_DIFF('day', (baseline_date + cash_discount_days_1 * INTERVAL '1' DAY)::DATE, CURRENT_DATE)
   END AS delay_days,
 
-  unpaid_amount
+  unpaid_amount,
+  total_cost,
+
+  -- ✅ Profit Margin Percentage
+  ROUND(
+    CASE 
+      WHEN invoice_amount > 0 THEN ((invoice_amount - total_cost) / invoice_amount)
+      ELSE 0 
+    END, 2
+  ) AS profit_margin_percent
 
 FROM agg
 ORDER BY billing_date DESC;
@@ -559,6 +583,7 @@ ORDER BY billing_date DESC;
   <Column id="billing_qty" title="Qty" fmt="num" align="center" />
   <Column id="payment_term_desc" title="Payment Term" align="center" />
   <Column id="paid_amount" title="Paid Amount" fmt="num1k" align="center" />
+  <Column id="profit_margin_percent" title="Profit %" fmt="pct" align="center" />
   <Column id="payment_status" title="Payment Status" align="center" />
   <Column id="clearing_date" title="Clearing Date" align="center" />
   <Column id="baseline_date" title="Baseline Date" align="center" />
@@ -566,15 +591,7 @@ ORDER BY billing_date DESC;
   <Column id="due_date" title="Due Date" align="center" />
   <Column id="delay_days" title="Delay Days" fmt="num" align="center" />
   <Column id="unpaid_amount" title="Unpaid Amount" fmt="num1k" align="center" />
+
 </DataTable>
 
 
-### Average Order Quantity Over Time
-
-<LineChart
-data={avg_qty_per_order_over_time}
-x=month
-y=avg_qty_per_order
-yFmt=num0k
-yAxisTitle="Avg Qty per Order"
-/>  

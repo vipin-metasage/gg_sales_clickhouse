@@ -2,14 +2,7 @@ SELECT
     invoice_number,
     invoice_item_number,
     invoice_date,
- arrayStringConcat(
-    arrayMap(
-        x -> concat(upperUTF8(left(x, 1)), substring(x, 2)),
-        splitByChar(' ', lowerUTF8(customer_name))
-    ),
-    ' '
-) AS customer_name
-,
+    customer_name,
     country_name,
     document_currency,
     freight_charges,
@@ -30,8 +23,6 @@ SELECT
     material_number,
     material_description,
     sd_item_category,
-    gross_weight,
-    weight_unit,
     payment_term_description,
     baseline_date,
     payment_date,
@@ -40,7 +31,7 @@ SELECT
     outstanding_amount,
     payment_status,
     material_group,
+    cost,
     dateDiff('day', baseline_date, payment_date) AS delay_days
 FROM manufacturing.analytics
-where invoice_date >= '2015-01-01'
-  AND shipping_term NOT IN ('EXW');
+where invoice_date >= '2015-01-01';
